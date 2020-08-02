@@ -1,6 +1,7 @@
 ﻿// --------------------------------------------------------------------------------
-// Copyright (c) J.D. Purcell
-//
+// Copyright (c) J.D. Purcell - Original code for generating chat logs, see https://github.com/jdpurcell/RechatTool February 24 2019 version for original code
+// Copyright (c) Jon Oddvar Rambjør - Code for exporting chat logs between timestamps, code for generating heatmaps of user engagement, code for extracting clips with ffmpeg
+// Modifications done by me, Jon Oddvar Rambjør, are done independently/without assosiation to J.D. Purcell as permitted by the original MIT License. 
 // Licensed under the MIT License (see LICENSE.txt)
 // --------------------------------------------------------------------------------
 using System;
@@ -285,7 +286,7 @@ namespace RechatTool
 				{
 					countList.Add(0);
 				}
-				if (jsonObj[i0].message.ToString().Contains(selectionCriteria) || selectionCriteria == "noSelection")
+				if (jsonObj[i0].message.ToString().ToLower().Contains(selectionCriteria.ToLower()) || selectionCriteria == "noSelection")
 				{
 					countList[(int) Math.Floor((decimal) jsonObj[i0].content_offset_seconds / (decimal) timeInterval)] += 1;
 				}
@@ -308,6 +309,39 @@ namespace RechatTool
 				}
 			}
 			imag.Save(outputPath);
+		}
+
+		public static void ExecuteFFMPEG(string ffmpegPath, string commandString)
+		{
+			// From https://www.codeproject.com/Articles/25983/How-to-Execute-a-Command-in-C
+			try
+			{
+				// create the ProcessStartInfo using "cmd" as the program to be run,
+				// and "/c " as the parameters.
+				// Incidentally, /c tells cmd that we want it to execute the command that follows,
+				// and then exit.
+				System.Diagnostics.ProcessStartInfo procStartInfo =
+					new System.Diagnostics.ProcessStartInfo("cmd", "/c " + ffmpegPath + commandString);
+				Console.WriteLine(ffmpegPath + commandString);
+				// The following commands are needed to redirect the standard output.
+				// This means that it will be redirected to the Process.StandardOutput StreamReader.
+				procStartInfo.RedirectStandardOutput = true;
+				procStartInfo.UseShellExecute = false;
+				// Do not create the black window.
+				procStartInfo.CreateNoWindow = true;
+				// Now we create a process, assign its ProcessStartInfo and start it
+				System.Diagnostics.Process proc = new System.Diagnostics.Process();
+				proc.StartInfo = procStartInfo;
+				proc.Start();
+				// Get the output into a string
+				string result = proc.StandardOutput.ReadToEnd();
+				// Display the command output.
+				Console.WriteLine(result);
+			}
+			catch (Exception objException)
+			{
+				// Log the exception
+			}
 		}
 	}
 }

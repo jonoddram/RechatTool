@@ -1,6 +1,7 @@
 ﻿// --------------------------------------------------------------------------------
-// Copyright (c) J.D. Purcell
-//
+// Copyright (c) J.D. Purcell - Original code for generating chat logs, see https://github.com/jdpurcell/RechatTool February 24 2019 version for original code
+// Copyright (c) Jon Oddvar Rambjør - Code for exporting chat logs between timestamps, code for generating heatmaps of user engagement, code for extracting clips with ffmpeg
+// Modifications done by me, Jon Oddvar Rambjør, are done independently/without assosiation to J.D. Purcell as permitted by the original MIT License. 
 // Licensed under the MIT License (see LICENSE.txt)
 // --------------------------------------------------------------------------------
 using System;
@@ -161,11 +162,77 @@ namespace RechatTool
 					List<int> engagementCountList = Rechat.GenerateEngagementCountList(inputPath, selectionCriteria, timeInterval);
 					Rechat.OutputHeatmap(engagementCountList, outputPath);
 				}
+				else if (arg == "-v")
+				{
+					string inputPath = GetArg();
+					string outputPath;
+					string selectionCriteria = GetArg();
+					int timeInterval = int.Parse(GetArg());
+					int clipCount = int.Parse(GetArg());
+					int prelude = int.Parse(GetArg());
+ 					float decreasePercentageTolerance = float.Parse(GetArg());
+					string ffmpegPath = GetArg();
+					string video_input_path = GetArg();
+					long video_max_length = TryParseTimestamp(GetArg());
+					if (args.Length > 10) // if a output path is provided
+					{
+						outputPath = args[10]; // index start at 0
+					}
+					else
+					{
+						outputPath = Path.GetDirectoryName(inputPath) + "\\";
+					}
+					List<int> engagementCountList = Rechat.GenerateEngagementCountList(inputPath, selectionCriteria, timeInterval);
+					Console.WriteLine(engagementCountList.Max());
+					List<int> workingCountList = new List<int>();
+					int clipNumber = 0;
+					List<String> clipPaths = new List<String>();
+					for (int i0 = 0; i0 < engagementCountList.Count; i0++)
+					{
+						workingCountList.Add(engagementCountList[i0]);
+					}
+					for (int i0 = 0; i0 < clipCount; i0++)
+					{
+						Console.WriteLine("---------");
+						int currentMax = workingCountList.Max();
+						int currentMaxIndex = workingCountList.FindIndex(x => x == currentMax);
+						long startPoint = currentMaxIndex * timeInterval - prelude;
+						Console.WriteLine("CurrentMax: " + currentMax.ToString());
+						Console.WriteLine("CurrentMaxIndex: " + currentMaxIndex.ToString());
+						Console.WriteLine("Working count list length: " + workingCountList.Count);
+						int i1 = 1; // Find out how many following clips are good enough to keep in the clip
+						while (currentMaxIndex + i1 < workingCountList.Count - 1)
+						{
+							if (engagementCountList[currentMaxIndex+i1] >= engagementCountList[currentMaxIndex] * decreasePercentageTolerance)
+							{
+								i1 += 1;
+							} 
+							else
+							{
+								i1 -= 1;
+								break;
+							}
+						}
+						long endPoint = currentMaxIndex * timeInterval + (i1 + 1) * timeInterval;
+						if (startPoint < 0)
+						{
+							startPoint = 0;
+						}
+						if (endPoint > video_max_length)
+						{
+							endPoint = video_max_length;
+						}
+						Rechat.ExecuteFFMPEG(ffmpegPath, " -ss " + startPoint.ToString() + " -i " + video_input_path + " -c copy -t " + (endPoint - startPoint).ToString() + " " + Path.Combine(outputPath, clipNumber.ToString() + ".mp4"));
+						clipNumber += 1;
+						clipPaths.Add(outputPath + clipNumber.ToString() + ".mp4");
+						Console.WriteLine("current max index now: " + currentMaxIndex.ToString());
+						workingCountList[currentMaxIndex] = 0;
+					}
+				}
 				else
 				{
 					throw new InvalidArgumentException();
 				}
-
 				return 0;
 			}
 			catch (InvalidArgumentException)
@@ -197,9 +264,21 @@ namespace RechatTool
 				Console.WriteLine("   -h input_path selection_criteria time_interval output_path\n" +
 								  "      Creates a heatmap from the input json file.\n" +
 								  "         input_path: The path to the input json you want to create a engagement heatmap from.)\n" +
-								  "         time_interval: How long each time interval should be.\n" +
 								  "         selection_criteria: Ignore comments that do not contain this substring. For no selection write noSelection.\n" +
+								  "         time_interval: How long each time interval should be.\n" +
 								  "         output_path: The path to the output image. Default is the same path as the input_path but just png.");
+				Console.WriteLine("   -v input_path selection_criteria time_interval clip_count prelude decrease_percentage_tolerance ffmpeg_path video_input_path video_max_length [output_path]\n" +
+								  "      Creates several video clip based on the input json file and the source videos.\n" +
+								  "         input_path: The path to the input json you want to create a engagement heatmap from.)\n" +
+								  "         selection_criteria: Ignore comments that do not contain this substring. For no selection write noSelection.\n" +
+								  "         time_interval: How long each time interval should be.\n" +
+								  "         clip_count: How many of the top clips should be extracted\n" +
+								  "         prelude: How many seconds should you play before the clip if possible.\n" +
+								  "         decrease_percentage_tolerance: How many percentage decrease in engagement successive clips after top point you should look through before cutting the clip.\n" +
+								  "         ffmpeg_path: Path to ffmpeg.exe\n" +
+								  "         video_input_path: path to source video\n" +
+								  "         video_max_length: Max length of video\n" +
+								  "         output_path: The path to the output image. Default is the same path as the input_path but just png.\n");
 				return 1;
 			}
 			catch (Exception ex)
