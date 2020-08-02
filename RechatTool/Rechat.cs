@@ -281,13 +281,13 @@ namespace RechatTool
 			List<int> countList = new List<int>();
 			for (int i0 = 0; i0 < jsonObj.Count; i0++)
 			{
-				while (jsonObj[i0].ContentOffsetSeconds / timeInterval > countList.Count)
+				while (jsonObj[i0].content_offset_seconds / timeInterval >= countList.Count)
 				{
 					countList.Add(0);
 				}
-				if (jsonObj[i0].Message.Contains(selectionCriteria) || selectionCriteria == "noSelection")
+				if (jsonObj[i0].message.ToString().Contains(selectionCriteria) || selectionCriteria == "noSelection")
 				{
-					countList[Math.Floor(jsonObj[i0].ContentOffsetSeconds / timeInterval)] += 1;
+					countList[(int) Math.Floor((decimal) jsonObj[i0].content_offset_seconds / (decimal) timeInterval)] += 1;
 				}
 			}
 			return countList;
@@ -303,7 +303,7 @@ namespace RechatTool
 				{
 					for (int i2 = 0; i2 < Math.Floor((countList.Count * 5) * countList[i0] / (double) maxVal); i2++)
 					{
-						imag.SetPixel(i0 * 10 + i1, i2, Color.Red);
+						imag.SetPixel(i0 * 10 + i1, countList.Count * 5-1-i2, Color.Red);
 					}
 				}
 			}

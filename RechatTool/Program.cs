@@ -146,7 +146,7 @@ namespace RechatTool
 				}
 				else if (arg == "-h")
 				{
-					string inputPath = @GetArg();
+					string inputPath = GetArg();
 					string outputPath;
 					string selectionCriteria = GetArg();
 					int timeInterval = int.Parse(GetArg());
