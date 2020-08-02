@@ -6,6 +6,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -271,6 +273,41 @@ namespace RechatTool
 				}
 				writer.WriteRaw("]");
 			}
+		}
+		public static List<int> GenerateEngagementCountList(string inputPath, string selectionCriteria, int timeInterval)
+		{
+			string json = File.ReadAllText(inputPath);
+			dynamic jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+			List<int> countList = new List<int>();
+			for (int i0 = 0; i0 < jsonObj.Count; i0++)
+			{
+				while (jsonObj[i0].ContentOffsetSeconds / timeInterval > countList.Count)
+				{
+					countList.Add(0);
+				}
+				if (jsonObj[i0].Message.Contains(selectionCriteria) || selectionCriteria == "noSelection")
+				{
+					countList[Math.Floor(jsonObj[i0].ContentOffsetSeconds / timeInterval)] += 1;
+				}
+			}
+			return countList;
+		}
+
+		public static void OutputHeatmap(List<int> countList, string outputPath)
+		{
+			Bitmap imag = new Bitmap(countList.Count * 10, countList.Count * 5);
+			int maxVal = countList.Max();
+			for (int i0 = 0; i0 < countList.Count; i0++)
+			{
+				for (int i1 = 0; i1 < 10; i1++)
+				{
+					for (int i2 = 0; i2 < Math.Floor((countList.Count * 5) * countList[i0] / (double) maxVal); i2++)
+					{
+						imag.SetPixel(i0 * 10 + i1, i2, Color.Red);
+					}
+				}
+			}
+			imag.Save(outputPath);
 		}
 	}
 }

@@ -4,6 +4,7 @@
 // Licensed under the MIT License (see LICENSE.txt)
 // --------------------------------------------------------------------------------
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -143,6 +144,23 @@ namespace RechatTool
 					}
 					Console.WriteLine("Done!");
 				}
+				else if (arg == "-h")
+				{
+					string inputPath = @GetArg();
+					string outputPath;
+					string selectionCriteria = GetArg();
+					int timeInterval = int.Parse(GetArg());
+					if (args.Length > 4) // if a output path is provided
+					{
+						outputPath = args[4]; // index start at 0
+					}
+					else
+					{
+						outputPath = Path.Combine(Path.GetDirectoryName(inputPath), Path.GetFileNameWithoutExtension(inputPath) + ".png");
+					}
+					List<int> engagementCountList = Rechat.GenerateEngagementCountList(inputPath, selectionCriteria, timeInterval);
+					Rechat.OutputHeatmap(engagementCountList, outputPath);
+				}
 				else
 				{
 					throw new InvalidArgumentException();
@@ -169,13 +187,19 @@ namespace RechatTool
 				Console.WriteLine("            extension changed to .txt.");
 				Console.WriteLine("        -o: Overwrite the existing output file. ");
 				Console.WriteLine("        -b: Show user badges (e.g. moderator/subscriber).");
-				Console.WriteLine("   -t input_path [start_timestamp] [end_timestamp] [output_path]");
+				Console.WriteLine("   -t input_path start_timestamp end_timestamp [output_path]");
 				Console.WriteLine("      Creates new file output_path (default: original input_path_start_timestamp_end_timestamp.json from a json file created by this program containing\n" +
 								  "      only chat messages from the time interval starTimestamp to endTimestamp (inclusive)\n" +
 								  "         input_path: The path to the json file you want to convert from. Should be absolute, not relative. \n" +
 								  "         start_timestamp: The start time of the chat interval you want to extract. Inclusive.\n (format hh:mm:ss" +
 								  "         end_timestamp: The end time of the chat interval you want to extract. Inclusive.\n" +
 								  "         output_path: The output path, absolute not relative. Default is original filename_start_timestamp_end_timestamp.json.");
+				Console.WriteLine("   -h input_path selection_criteria time_interval output_path\n" +
+								  "      Creates a heatmap from the input json file.\n" +
+								  "         input_path: The path to the input json you want to create a engagement heatmap from.)\n" +
+								  "         time_interval: How long each time interval should be.\n" +
+								  "         selection_criteria: Ignore comments that do not contain this substring. For no selection write noSelection.\n" +
+								  "         output_path: The path to the output image. Default is the same path as the input_path but just png.");
 				return 1;
 			}
 			catch (Exception ex)
