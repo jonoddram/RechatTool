@@ -341,6 +341,7 @@ namespace RechatTool
 			catch (Exception objException)
 			{
 				// Log the exception
+				Console.WriteLine(objException.ToString());
 			}
 		}
 	}

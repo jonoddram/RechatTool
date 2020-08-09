@@ -19,12 +19,12 @@ namespace RechatTool
 
 		private static int Main(string[] args)
 		{
+			//args = @"-auto D:\Videos\1 0,5 0,3 noSelection 15 D:\jonod\ffmpeg\bin\ffmpeg.exe".Split(' ');
 			int iArg = 0;
 			string PeekArg() =>
 				iArg < args.Length ? args[iArg] : null;
 			string GetArg(bool optional = false) =>
 				iArg < args.Length ? args[iArg++] : optional ? (string)null : throw new InvalidArgumentException();
-
 			try
 			{
 				string arg = GetArg();
@@ -170,7 +170,7 @@ namespace RechatTool
 					int timeInterval = int.Parse(GetArg());
 					int clipCount = int.Parse(GetArg());
 					int prelude = int.Parse(GetArg());
- 					float decreasePercentageTolerance = float.Parse(GetArg());
+					float decreasePercentageTolerance = float.Parse(GetArg());
 					string ffmpegPath = GetArg();
 					string video_input_path = GetArg();
 					long video_max_length = TryParseTimestamp(GetArg());
@@ -193,20 +193,16 @@ namespace RechatTool
 					}
 					for (int i0 = 0; i0 < clipCount; i0++)
 					{
-						Console.WriteLine("---------");
 						int currentMax = workingCountList.Max();
 						int currentMaxIndex = workingCountList.FindIndex(x => x == currentMax);
 						long startPoint = currentMaxIndex * timeInterval - prelude;
-						Console.WriteLine("CurrentMax: " + currentMax.ToString());
-						Console.WriteLine("CurrentMaxIndex: " + currentMaxIndex.ToString());
-						Console.WriteLine("Working count list length: " + workingCountList.Count);
 						int i1 = 1; // Find out how many following clips are good enough to keep in the clip
 						while (currentMaxIndex + i1 < workingCountList.Count - 1)
 						{
-							if (engagementCountList[currentMaxIndex+i1] >= engagementCountList[currentMaxIndex] * decreasePercentageTolerance)
+							if (engagementCountList[currentMaxIndex + i1] >= engagementCountList[currentMaxIndex] * decreasePercentageTolerance)
 							{
 								i1 += 1;
-							} 
+							}
 							else
 							{
 								i1 -= 1;
@@ -227,6 +223,155 @@ namespace RechatTool
 						clipPaths.Add(outputPath + clipNumber.ToString() + ".mp4");
 						Console.WriteLine("current max index now: " + currentMaxIndex.ToString());
 						workingCountList[currentMaxIndex] = 0;
+					}
+				}
+				else if (arg == "-auto") // good settings for mode 1: Time interval 15, breakoffpercentage 0.3, growthRateTrigger 2.8, for mode 2: 
+				{
+					string videoFolder = args[1]; // Folder with all videos in it named by id
+					float growthRateTrigger = float.Parse(args[2]);
+					float breakoffPercentage = float.Parse(args[3]);
+					string selectionCriteria = args[4];
+					int timeInterval = int.Parse(args[5]);
+					string ffmpegPath = args[6];
+					int mode = int.Parse(args[7]);
+					string[] filePaths = Directory.GetFiles(videoFolder);
+					List<String> newFilePaths = new List<String>();
+					for (int i0 = 0; i0 < filePaths.Length; i0++) // Might be redundant but was useful for testing without having to redownload chat log
+					{
+						if (!filePaths[i0].Contains(".json"))
+						{
+							newFilePaths.Add(filePaths[i0]);
+						}
+					}
+					filePaths = newFilePaths.ToArray();
+					string videoIDString;
+					for (int i0 = 0; i0 < filePaths.Length; i0++)  // For each video
+					{ 
+						// Get the chat messages
+						videoIDString = Path.GetFileNameWithoutExtension((string) filePaths.GetValue(i0));
+						long videoID = long.Parse(videoIDString);
+						Console.WriteLine("Downloading" + videoIDString);
+						/*
+						long videoId = videoIDString.TryParseInt64() ??
+						TryParseVideoIdFromUrl(videoIDString) ??
+						throw new InvalidArgumentException();
+						string path = Path.Combine(videoFolder, $"{videoId}.json");
+						Console.WriteLine(path);
+						void UpdateProgress(int segmentCount, TimeSpan? contentOffset)
+						{
+							string message = $"Downloaded {segmentCount} segment{(segmentCount == 1 ? "" : "s")}";
+							if (contentOffset != null)
+							{
+								message += $", offset = {Rechat.TimestampToString(contentOffset.Value, false)}";
+							}
+							Console.Write($"\r{message}");
+						}
+						try
+						{
+							Rechat.DownloadFile(videoId, path, true, UpdateProgress);
+							Console.WriteLine();
+						}
+						catch (WarningException ex)
+						{
+							Console.WriteLine();
+							Console.WriteLine($"Warning: {ex.Message}");
+						}
+						*/
+						Console.WriteLine("Processing " + videoIDString);
+						// Get the engagement
+						List<int> engagementCountList = Rechat.GenerateEngagementCountList(Path.Combine(videoFolder, videoIDString + ".json"), selectionCriteria, timeInterval);
+						Console.WriteLine("Engagement calculated");
+						List<float> derivatives = NumericalDerivativeInt(engagementCountList, timeInterval); // Take derivative
+						List<int[]> exportIntervals = new List<int[]>();
+						if (mode == 0)
+						{
+							Console.WriteLine("Derivatives calculated");
+							int[] currentInterval = new int[] { 0, 0 };
+							bool hit = false;
+							for (int i1 = 0; i1 < engagementCountList.Count - 1; i1++) // Find parts of the intervals where engagement is high enough
+							{
+								// Basic alg: If derivative is high enough, include all time segments where derivative is still high enough. After that keep video segments with enough total engagement of top point in already current interval
+								if (growthRateTrigger <= derivatives[i1])
+								{
+									Console.WriteLine(derivatives[i1]);
+									currentInterval[0] = i1;
+									hit = true;
+								}
+								else if (hit == true)
+								{
+									if (engagementCountList[i1] < engagementCountList.GetRange(currentInterval[i0], i1 + 1 - currentInterval[0]).Max() * breakoffPercentage)
+									{
+										currentInterval[1] = i1 + 1;
+										hit = false;
+										exportIntervals.Add(currentInterval);
+										currentInterval = new int[] { 0, 0 };
+									}
+								}
+							}
+							if (hit)
+							{
+								currentInterval[1] = engagementCountList.Count;
+								exportIntervals.Add(currentInterval);
+							}
+						}
+						else
+						{
+							List<int> workingCountList = new List<int>();
+							for (int i1 = 0; i1 < engagementCountList.Count; i1++)
+							{
+								workingCountList.Add(engagementCountList[i1]);
+							}
+							for (int i1 = 0; i1 < 10; i1++)
+							{
+								int currentMax = workingCountList.Max();
+								int currentMaxIndex = workingCountList.FindIndex(x => x == currentMax);
+								float startPoint = currentMaxIndex * timeInterval - 2*timeInterval;
+								int i2 = 1; // Find out how many following clips are good enough to keep in the clip
+								while (currentMaxIndex + i2 < workingCountList.Count - 1)
+								{
+									if (engagementCountList[currentMaxIndex + i2] >= engagementCountList[currentMaxIndex] * breakoffPercentage)
+									{
+										i2 += 1;
+									}
+									else
+									{
+										i2 -= 1;
+										break;
+									}
+								}
+								float endPoint = currentMaxIndex * timeInterval + (i2 + 1) * timeInterval;
+								exportIntervals.Add(new int[] { currentMaxIndex, currentMaxIndex + i2 + 1 });
+								workingCountList[currentMaxIndex] = 0;
+							}
+						}
+						Console.WriteLine("Calculated export intervals.");
+						int clipNumber = 0;
+						for (int i1 = 0; i1 < exportIntervals.Count; i1++)
+						{
+							float[] timestamps;
+							if (mode == 0)
+							{
+								timestamps = new float[] { timeInterval * exportIntervals[i1][0], timeInterval * exportIntervals[i1][1] }; // Could include timestamps beyond end of video in rare cases. TBH it depends on FFMPEG so IDK.
+							}
+							else
+							{
+								timestamps = new float[] { timeInterval * exportIntervals[i1][0] - 2 * timeInterval, timeInterval * exportIntervals[i1][1] };
+							}
+							Console.WriteLine(i1);
+							float startPoint = timestamps[0];
+							float endPoint = timestamps[1];
+							Rechat.ExecuteFFMPEG(ffmpegPath, " -ss " + startPoint.ToString() + " -i " + @filePaths.GetValue(i0) + " -c copy -t " + (endPoint - startPoint).ToString() + " " + @Path.Combine(videoFolder, videoIDString + "-" + clipNumber.ToString() + ".mp4"));
+							using (StreamWriter textWriter = new StreamWriter(Path.Combine(videoFolder, videoIDString + ".txt"), true))
+							{
+								textWriter.WriteLine("file '" + Path.Combine(videoFolder, videoIDString + "-" + clipNumber.ToString() + ".mp4'"));
+							}
+							clipNumber += 1;
+						}
+						Rechat.ExecuteFFMPEG(ffmpegPath, " -safe 0 -f concat -i " + Path.Combine(videoFolder, videoIDString + ".txt") + " -c copy " + Path.Combine(videoFolder, videoIDString + "-TOP.mp4"));
+						Console.WriteLine("Combined clips.");
+						Rechat.ExecuteFFMPEG(ffmpegPath, " -i " + Path.Combine(videoFolder, videoIDString + "-TOP.mp4") + " -vf -video_track_timescale 29971 -ac 1 " +
+							Path.Combine(videoFolder, videoIDString + "-" + clipNumber.ToString() + "-TOPAUDIOPAD.mp4")); // should fix audio
+
 					}
 				}
 				else
@@ -323,5 +468,15 @@ namespace RechatTool
 		}
 
 		private class InvalidArgumentException : Exception { }
+
+		public static List<float> NumericalDerivativeInt(List<int> numbers, int timeStep) // through newtons difference quotient
+		{
+			List<float> toReturn = new List<float>();
+			for (int i0 = 0; i0 < numbers.Count -1; i0++)
+			{
+				toReturn.Add(((float) numbers[i0 + 1] - (float) numbers[i0]) / (float) timeStep);
+			}
+			return toReturn;
+		}
 	}
 }
