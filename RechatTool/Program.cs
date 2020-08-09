@@ -246,12 +246,11 @@ namespace RechatTool
 					filePaths = newFilePaths.ToArray();
 					string videoIDString;
 					for (int i0 = 0; i0 < filePaths.Length; i0++)  // For each video
-					{ 
+					{
 						// Get the chat messages
-						videoIDString = Path.GetFileNameWithoutExtension((string) filePaths.GetValue(i0));
+						videoIDString = Path.GetFileNameWithoutExtension((string)filePaths.GetValue(i0));
 						long videoID = long.Parse(videoIDString);
 						Console.WriteLine("Downloading" + videoIDString);
-						/*
 						long videoId = videoIDString.TryParseInt64() ??
 						TryParseVideoIdFromUrl(videoIDString) ??
 						throw new InvalidArgumentException();
@@ -276,7 +275,6 @@ namespace RechatTool
 							Console.WriteLine();
 							Console.WriteLine($"Warning: {ex.Message}");
 						}
-						*/
 						Console.WriteLine("Processing " + videoIDString);
 						// Get the engagement
 						List<int> engagementCountList = Rechat.GenerateEngagementCountList(Path.Combine(videoFolder, videoIDString + ".json"), selectionCriteria, timeInterval);
@@ -325,7 +323,7 @@ namespace RechatTool
 							{
 								int currentMax = workingCountList.Max();
 								int currentMaxIndex = workingCountList.FindIndex(x => x == currentMax);
-								float startPoint = currentMaxIndex * timeInterval - 2*timeInterval;
+								float startPoint = currentMaxIndex * timeInterval - 2 * timeInterval;
 								int i2 = 1; // Find out how many following clips are good enough to keep in the clip
 								while (currentMaxIndex + i2 < workingCountList.Count - 1)
 								{
@@ -357,7 +355,6 @@ namespace RechatTool
 							{
 								timestamps = new float[] { timeInterval * exportIntervals[i1][0] - 2 * timeInterval, timeInterval * exportIntervals[i1][1] };
 							}
-							Console.WriteLine(i1);
 							float startPoint = timestamps[0];
 							float endPoint = timestamps[1];
 							Rechat.ExecuteFFMPEG(ffmpegPath, " -ss " + startPoint.ToString() + " -i " + @filePaths.GetValue(i0) + " -c copy -t " + (endPoint - startPoint).ToString() + " " + @Path.Combine(videoFolder, videoIDString + "-" + clipNumber.ToString() + ".mp4"));
@@ -424,7 +421,16 @@ namespace RechatTool
 								  "         video_input_path: path to source video\n" +
 								  "         video_max_length: Max length of video\n" +
 								  "         output_path: The path to the output image. Default is the same path as the input_path but just png.\n");
-				return 1;
+				Console.WriteLine("   -auto videoFolder growthRateTrigger breakoffPercentage selectionCriteria timeInterval ffmpegPath mode\n" +
+								  "		  Creates clip for every video in folder, automatically downloads their chat logs." +
+								  "		     videoFolder: Path to the folder containing videos, video names must equal Twitch ID.\n" +
+								  "          growthRateTrigger: How large the derivative must be to start a clip when mode = 1" +
+								  "          breakoffPercentage: How much lower the chat activity should be than the top point in the clip for it to be included." +
+								  "          selectionCriteria: For no selection write noSelection. Ignore comments that do not contain this substring." +
+								  "          timeInterval: How long the time intervals for sampling comments should be" +
+								  "          ffmpegPath: Path to the ffmpeg exe file" +
+								  "          mode: Mode 0 is based on taking clips around the points with the most chat activity, mode 1 is based on starting clips when the derivative of the chat activity is high enough.");
+				return 0;
 			}
 			catch (Exception ex)
 			{
